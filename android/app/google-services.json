@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "79153949825",
+    "project_id": "lwwb-efe26",
+    "storage_bucket": "lwwb-efe26.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:79153949825:android:cc9830ad0c984209bdf180",
+        "android_client_info": {
+          "package_name": "com.alex_osh.lwwb"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "79153949825-05dluea30bgpsi97ccfd7cn66d6gi7ro.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDKtlc1mAMA2-ZqaRQ5HH3pen8M5_zHK1s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "79153949825-05dluea30bgpsi97ccfd7cn66d6gi7ro.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
