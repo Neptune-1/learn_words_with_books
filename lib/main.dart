@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:ui';
 
+import 'package:LwwB/word_db.dart';
 import 'package:async/async.dart';
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -41,12 +43,43 @@ class MainPage extends StatefulWidget {
 }
 
 class MainPageState extends State<MainPage> {
+
+
   bool photoBSAnimationEnd = false;
   bool BSPhotoState = false;
-  String imageForAdvEmoo;
+  List<String> imageForAdvEmoo = [];
 
   AsyncMemoizer _memoizerPhotoBar = AsyncMemoizer();
   AsyncMemoizer _memoizerCamera = AsyncMemoizer();
+
+  GetWords() async{
+      var data = {
+        "n_im": (imageForAdvEmoo.length).toString(),
+      };
+
+      for(int i = 0; i<imageForAdvEmoo.length; i++){
+        List<int> imageBytes = await io.File(imageForAdvEmoo[i]).readAsBytes();
+        String base64Image = base64Encode(imageBytes);
+        data["im_"+i.toString()] = base64Image;
+      }
+      //encode Map to JSON
+
+      var body = json.encode(data);
+      var response = await http.post(
+          Uri.parse("https://happ-server.azurewebsites.net/api/v0.01/lwwb"),
+          body: body,
+          headers: {'Content-Type': 'application/json'}
+      );
+      Map dataRes = jsonDecode(response.body);
+
+      if(dataRes["resp"]=="ok") {
+        for(int i = 0; i<dataRes["w_n"]; i++){
+          String i_str = i.toString();
+          Word word = Word(word_1: dataRes["word_1_"+i_str], word_2: dataRes["word_2_"+i_str], wordLg_1: dataRes["wordLg_1_"+i_str], wordLg_2: dataRes["wordLg_2_"+i_str] , wordTime: DateTime.now().millisecondsSinceEpoch , learnt: false );
+        }
+      }
+
+  }
 
   Future<CameraController> getCameraController() async{
     List<CameraDescription> cameras;
@@ -80,7 +113,15 @@ class MainPageState extends State<MainPage> {
     return Scaffold(
       backgroundColor: Colors.indigo[50],
       body: Stack(children: [
-        Align(child: Padding(
+        GestureDetector(onTap: () {setState(() {
+          BSPhotoState = false;
+          FocusScopeNode currentFocus = FocusScope.of(context);
+          if (!currentFocus.hasPrimaryFocus) {
+            currentFocus.unfocus();
+
+          }
+        });},
+        child:  Stack(children: [Align(child: Padding(
           padding: EdgeInsets.fromLTRB(0,50,0,0),
           child: Container(
             padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -105,39 +146,41 @@ class MainPageState extends State<MainPage> {
                   borderRadius: BorderRadius.circular(2.5),
                   color: Colors.indigo[600],
                 ),
-                height: 30,
-                width: 5,),
+                  height: 30,
+                  width: 5,),
                 Text("RU", style: TextStyle(color: Colors.indigo[600], fontWeight: FontWeight.bold),),
               ],
             ),
           ),
         ),
           alignment: Alignment(0, -1),),
-        Align(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(0, 70, 0, 0),
-            child: ListView(children: [
-              WordWidget(),
-              WordWidget(),
-              WordWidget(),
-              WordWidget(),
-            ],),),
-          alignment: Alignment(0, -1),
-        ),
-        GestureDetector(
-          onTap: () {setState(() {
-            BSPhotoState = false;
-          });},
-          child: AnimatedOpacity(
-            child: Container(
-              height: double.infinity,
-              width: double.infinity,
-              color: Colors.black,
-            ),
-            opacity: BSPhotoState ? 0.33 : 0,
-            duration: Duration(milliseconds: 500),
-          ),
-        ),
+          Align(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(0, 70, 0, 0),
+              child: ListView(children: [
+                WordWidget(),
+                WordWidget(),
+                WordWidget(),
+                WordWidget(),
+              ],),),
+            alignment: Alignment(0, -1),
+          ),],),),
+
+
+        // GestureDetector(
+        //   onTap: () {setState(() {
+        //     BSPhotoState = false;
+        //   });},
+        //   child: AnimatedOpacity(
+        //     child: Container(
+        //       height: double.infinity,
+        //       width: double.infinity,
+        //       color: Colors.black,
+        //     ),
+        //     opacity: BSPhotoState ? 0.33 : 0,
+        //     duration: Duration(milliseconds: 500),
+        //   ),
+        // ),
         Align(alignment: Alignment.bottomCenter,
             child: Padding(
               padding: EdgeInsets.symmetric(vertical: 15, horizontal: 20),
@@ -231,14 +274,33 @@ class MainPageState extends State<MainPage> {
 
               child:Column(
                 children: [
-                  SizedBox(height: 30,),
+                  AnimatedOpacity(opacity: imageForAdvEmoo.length == 0 ? 0 : 1, duration: Duration(milliseconds: 550),
+                    child: AnimatedContainer(
+                      padding: EdgeInsets.fromLTRB(0, 0, 0, 10),
+                      height: imageForAdvEmoo.length == 0 ? 30 : 60,
+                      width: double.infinity,
+                      child: GestureDetector(
+                        onTap: () {setState(() {
+                          imageForAdvEmoo=[];
+                          BSPhotoState = false;
+                          photoBSAnimationEnd=false;
+                        });},
+                        child: Container(
+                          child: Icon(Icons.upload_rounded, color: Colors.indigo[100],),
+                          decoration: BoxDecoration(
+                              borderRadius: BorderRadius.only(topLeft: Radius.circular(30), topRight: Radius.circular(30), ),
+                              color: Colors.indigo[200]
+                          ),),
+                      ),
+                      duration: Duration(milliseconds: 550),)
+                    ,),
                   Expanded(child: FutureBuilder(
                     future:_memoizerPhotoBar.runOnce(loadImageList),
                     builder: (context, allImagesSnapshot)
                     {
                       if(allImagesSnapshot.data==null)
                         return Center(
-                            child: CircularProgressIndicator(backgroundColor: Colors.red)
+                            child: CircularProgressIndicator()
                         );
                       else
                         return Padding(
@@ -269,7 +331,7 @@ class MainPageState extends State<MainPage> {
                                                   builder: (context, snapshotCamController) {
                                                     return snapshotCamController.data==null ? Stack(
                                                       children: [
-                                                        Container(color: Colors.grey,),
+                                                        Container(color: Colors.indigo[50],),
                                                         Center(
                                                           child: Image.asset("assets/camera_icon.png", width: 45,),
                                                         )],
@@ -284,7 +346,7 @@ class MainPageState extends State<MainPage> {
                                                           // await snapshotCamController.data.takePicture(path);
                                                           final picker = ImagePicker();
 
-                                                          imageForAdvEmoo = (await picker.getImage(source: ImageSource.camera)).path;
+                                                          imageForAdvEmoo.add((await picker.getImage(source: ImageSource.camera)).path);
                                                           _memoizerCamera = AsyncMemoizer();
                                                           BSPhotoState = false;
                                                           photoBSAnimationEnd=false;
@@ -317,7 +379,7 @@ class MainPageState extends State<MainPage> {
 
                                           child:Stack(
                                             children: [
-                                              Container(color: Colors.grey,),
+                                              Container(color: Colors.indigo[50],),
                                               Center(
                                                 child: Image.asset("assets/camera_icon.png", width: 45,),
                                               )
@@ -328,30 +390,50 @@ class MainPageState extends State<MainPage> {
 
                                 }
                                 else{
-                                  return Padding(
-                                      padding: EdgeInsets.all(5),
-                                      child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(15),
-                                          child: FutureBuilder(
-                                              future: loadImageFile(allImagesSnapshot.data[index-1]),
-                                              builder: (context, entitySnapshot) {
-                                                return InkWell(
-                                                    onTap: () {
-                                                      imageForAdvEmoo = entitySnapshot.data.path;
-                                                      BSPhotoState = false;
-                                                      photoBSAnimationEnd=false;
-                                                    },
+                                  return
+                                    FutureBuilder(
+                                        future: loadImageFile(allImagesSnapshot.data[index-1]),
+                                        builder: (context, entitySnapshot) {
 
-                                                    child:  entitySnapshot.data==null ? Container() : Image.file(
-                                                      entitySnapshot.data,
-                                                      fit: BoxFit.cover,
-                                                      filterQuality: FilterQuality.low,
-                                                      cacheWidth: 250,
-                                                    )
-                                                );
-                                              }
-                                          )
-                                      ));
+                                          return InkWell(
+                                              onTap: () {
+
+                                                setState(() {
+                                                  if(!imageForAdvEmoo.contains(entitySnapshot.data.path)){
+                                                    imageForAdvEmoo.add(entitySnapshot.data.path);
+                                                  }
+                                                  else{
+                                                    imageForAdvEmoo.remove(entitySnapshot.data.path);
+                                                  }
+                                                });
+
+                                              },
+
+                                              child:  entitySnapshot.data==null ? Container() :
+                                              Padding(padding: EdgeInsets.all(5), child: Container(
+                                                  decoration: BoxDecoration(
+                                                      color: Colors.indigo[200],
+                                                      borderRadius: BorderRadius.circular(15)
+                                                  ),
+                                                  child: AnimatedPadding(
+                                                      padding: EdgeInsets.all(imageForAdvEmoo.contains(entitySnapshot.data.path) ? 7 : 0),
+                                                      duration: Duration(milliseconds: 800),
+                                                      curve: Curves.easeInOutBack,
+                                                      child: ClipRRect(
+                                                        borderRadius: BorderRadius.circular(15),
+                                                        child: Image.file(
+                                                          entitySnapshot.data,
+                                                          fit: BoxFit.cover,
+                                                          filterQuality: FilterQuality.low,
+                                                          cacheWidth: 250,
+                                                        ),
+                                                      ))),)
+
+
+                                          );
+                                        }
+                                    );
+
 
                                 }
 
@@ -375,11 +457,16 @@ class MainPageState extends State<MainPage> {
 
 class WordWidget extends StatelessWidget{
 
+  TextEditingController controller1 = new TextEditingController();
+  TextEditingController controller2 = new TextEditingController();
   @override
   Widget build(BuildContext context) {
+    controller1.text ="Wall";
+    controller2.text ="Wand";
     return Padding(
         padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 30),
           height: 30,
           width: double.infinity,
           decoration: new BoxDecoration(
@@ -391,6 +478,19 @@ class WordWidget extends StatelessWidget{
                 color: Colors.indigo[100].withOpacity(0.5),
                 blurRadius: 2,
               )
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(child: TextField(
+                textInputAction: TextInputAction.done, maxLines: 1, controller: controller1, style: TextStyle(color: Colors.indigo[600], fontWeight: FontWeight.bold), textAlign: TextAlign.left,
+                decoration: InputDecoration( border: InputBorder.none,contentPadding: EdgeInsets.symmetric(vertical: 5), isDense: true,),
+              ), width: 100,),
+              Container(child: TextField(
+                textInputAction: TextInputAction.done, maxLines: 1, controller: controller2, style: TextStyle(color: Colors.indigo[600], fontWeight: FontWeight.bold), textAlign: TextAlign.right,
+                decoration: InputDecoration( border: InputBorder.none,contentPadding: EdgeInsets.symmetric(vertical: 5), isDense: true,),
+              ), width: 100,),
             ],
           ),
         ));
